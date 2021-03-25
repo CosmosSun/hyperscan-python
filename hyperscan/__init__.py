@@ -42,7 +42,7 @@ class Hyperscan(object):
       raise ValueError("Need one flags entry for each pattern!")
 
     if not flags:
-      flags = [self._hs.HS_FLAG_DOTALL] * len(patterns)
+      flags = [self._hs.HS_FLAG_DOTALL | self._hs.HS_FLAG_SINGLEMATCH] * len(patterns)
 
     if mode is None:
       mode = self._hs.HS_MODE_BLOCK
@@ -68,12 +68,16 @@ class Hyperscan(object):
     cffi_flags = self._ffi.new("int []", flags)
     cffi_flags_p = self._ffi.cast("unsigned int *", cffi_flags)
 
+    ids = [id for id in range(0, len(patterns))]
+    cffi_ids = self._ffi.new("unsigned int []", ids)
+    cffi_ids_p = self._ffi.cast("unsigned int *", cffi_ids)
+
     database_p = self._ffi.new("hs_database_t **")
 
     compile_error_p = self._ffi.new("hs_compile_error_t **")
 
     res = self._hs.hs_compile_multi(cffi_array, cffi_flags_p,
-                                    self._ffi.cast("unsigned int *", 0),
+                                    cffi_ids_p,
                                     len(patterns), mode,
                                     self._ffi.cast("hs_platform_info_t *", 0),
                                     database_p, compile_error_p)
