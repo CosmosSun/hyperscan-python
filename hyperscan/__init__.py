@@ -87,6 +87,7 @@ class Hyperscan(object):
       raise RuntimeError(msg)
 
     self._database_p = database_p
+    self._scratch_p = self._AllocateScratch()
 
   def _AllocateScratch(self):
     scratch_pp = self._ffi.new("hs_scratch_t **")
@@ -111,9 +112,7 @@ class Hyperscan(object):
     """Scans a single block of data for the patterns."""
     self._EnsureMode(self._hs.HS_MODE_BLOCK)
 
-    scratch_p = self._AllocateScratch()
     hits = []
-
     @self._ffi.callback(
         "int(unsigned int id, unsigned long long from, unsigned long long to, "
         "unsigned int flags, void *ctx)")
@@ -126,12 +125,8 @@ class Hyperscan(object):
           return ret
       return 0
 
-    self._hs.hs_scan(self._database_p[0], data, len(data), 0, scratch_p[0],
+    self._hs.hs_scan(self._database_p[0], data, len(data), 0, self._scratch_p[0],
                      _MatchCallback, self._ffi.cast("void *", 0))
-
-    res = self._hs.hs_free_scratch(scratch_p[0])
-    if res != self._hs.HS_SUCCESS:
-      raise RuntimeError("Error freeing scratch (%d)!" % res)
 
     return bool(hits)
 
@@ -144,8 +139,7 @@ class Hyperscan(object):
       pass
 
     self._EnsureMode(self._hs.HS_MODE_STREAM)
-
-    scratch_p = self._AllocateScratch()
+    
     stream_p = self._ffi.new("hs_stream_t **")
 
     res = self._hs.hs_open_stream(self._database_p[0], 0, stream_p)
@@ -164,7 +158,6 @@ class Hyperscan(object):
 
     self._stream_callback = _MatchCallback
     self._stream_p = stream_p
-    self._scratch_p = scratch_p
     return self
 
   def StreamScan(self, data):
@@ -189,17 +182,14 @@ class Hyperscan(object):
     res = self._hs.hs_close_stream(self._stream_p[0], self._scratch_p[0],
                                    self._stream_callback,
                                    self._ffi.cast("void *", 0))
-    if res != self._hs.HS_SUCCESS:
-      raise RuntimeError("Error while closing stream (%d)!" % res)
-    self._FreeScratch(self._scratch_p)
 
-    del self._scratch_p
     del self._stream_p
     del self._stream_callback
 
   def __del__(self):
     try:
       self._hs.hs_free_database(self._database_p[0])
+      self._FreeScratch(self._scratch_p[0])
     except AttributeError:
       pass
 
@@ -208,3 +198,4 @@ class Hyperscan(object):
 
   def __exit__(self, unused_type, unused_value, unused_traceback):
     self.CloseStream()
+    self._FreeScratch(self._scratch_p[0])
