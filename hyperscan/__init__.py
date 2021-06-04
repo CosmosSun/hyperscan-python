@@ -15,7 +15,7 @@
 # limitations under the License.
 """Simple bindings for Hyperscan."""
 
-import hyperscan_lib
+from .hyperscan_lib import InitHyperscanLib
 
 
 class Hyperscan(object):
@@ -34,7 +34,7 @@ class Hyperscan(object):
       ValueError: Arguments could not be used.
     """
 
-    self._ffi, self._hs = hyperscan_lib.InitHyperscanLib()
+    self._ffi, self._hs = InitHyperscanLib()
 
     if not patterns:
       raise ValueError("Must give some patterns to scan for!")
@@ -62,7 +62,7 @@ class Hyperscan(object):
     except AttributeError:
       pass
 
-    cffi_patterns = [self._ffi.new("char []", pattern) for pattern in patterns]
+    cffi_patterns = [self._ffi.new("char []", pattern.encode()) for pattern in patterns]
     cffi_array = self._ffi.new("char *[]", cffi_patterns)
 
     cffi_flags = self._ffi.new("int []", flags)
@@ -121,11 +121,12 @@ class Hyperscan(object):
         hits.append(True)
       if callback:
         ret = callback(pat_id, from_off, to_off, flags, ctx)
-        if isinstance(ret, (int, long)):
+        if isinstance(ret, (int)):
           return ret
       return 0
-
-    self._hs.hs_scan(self._database_p[0], data, len(data), 0, self._scratch_p[0],
+    
+    encode_data = data.encode()
+    self._hs.hs_scan(self._database_p[0], encode_data, len(encode_data), 0, self._scratch_p[0],
                      _MatchCallback, self._ffi.cast("void *", 0))
 
     return bool(hits)

@@ -124,9 +124,10 @@ def InitHyperscanLib():
     return _ffi, _hs
   ffi = cffi.FFI()
   ffi.cdef(cdefs)
-  hs = ffi.verify("""
+  #hs = ffi.verify("""
   #include <hs/hs.h>
-  """, libraries=["hs"])
+  #""", libraries=["hs"])
+  hs = ffi.dlopen("libhs.so")
 
   _ffi = ffi
   _hs = hs
